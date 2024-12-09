@@ -102,12 +102,6 @@ def parse_args(args):
         help="Path to imagenet v2 for conducting zero shot evaluation.",
     )
     parser.add_argument(
-        "--cache-dir",
-        type=str,
-        default=None,
-        help="Override system default cache path for model & tokenizer file downloads.",
-    )
-    parser.add_argument(
         "--logs",
         type=str,
         default="./logs/",
@@ -312,21 +306,15 @@ def parse_args(args):
     parser.add_argument(
         "--accum-freq", type=int, default=1, help="Update the model every --acum-freq steps."
     )
-    parser.add_argument(
-        "--device", default="cuda", type=str, help="Accelerator to use."
-    )
     # arguments for distributed training
     parser.add_argument(
         "--dist-url",
-        default=None,
+        default="env://",
         type=str,
         help="url used to set up distributed training",
     )
     parser.add_argument(
-        "--dist-backend",
-        default=None,
-        type=str,
-        help="distributed backend. \"nccl\" for GPU, \"hccl\" for Ascend NPU"
+        "--dist-backend", default="nccl", type=str, help="distributed backend"
     )
     parser.add_argument(
         "--report-to",
