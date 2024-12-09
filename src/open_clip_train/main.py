@@ -11,6 +11,7 @@ from functools import partial
 import numpy as np
 import torch
 from torch import optim
+from torch.cuda.amp import GradScaler
 
 try:
     import wandb
@@ -236,7 +237,6 @@ def main(args):
         aug_cfg=args.aug_cfg,
         pretrained_image=args.pretrained_image,
         output_dict=True,
-        cache_dir=args.cache_dir,
         **model_kwargs,
     )
     if args.distill:
@@ -247,7 +247,6 @@ def main(args):
             device=device,
             precision=args.precision,
             output_dict=True,
-            cache_dir=args.cache_dir,
         )
     if args.use_bnb_linear is not None:
         print('=> using a layer from bitsandbytes.\n'
@@ -330,12 +329,7 @@ def main(args):
             hvd.broadcast_parameters(model.state_dict(), root_rank=0)
             hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 
-        scaler = None
-        if args.precision == "amp":
-            try:
-                scaler = torch.amp.GradScaler(device=device)
-            except (AttributeError, TypeError) as e:
-                scaler = torch.cuda.amp.GradScaler()
+        scaler = GradScaler() if args.precision == "amp" else None
 
     # optionally resume from a checkpoint
     start_epoch = 0
@@ -359,7 +353,7 @@ def main(args):
             logging.info(f"=> loaded checkpoint '{args.resume}' (epoch {start_epoch})")
 
     # initialize datasets
-    tokenizer = get_tokenizer(args.model, cache_dir=args.cache_dir)
+    tokenizer = get_tokenizer(args.model)
     data = get_data(
         args,
         (preprocess_train, preprocess_val),
@@ -422,12 +416,6 @@ def main(args):
     original_model = model
     if args.torchcompile:
         logging.info('Compiling model...')
-
-        if args.grad_checkpointing and args.distributed:
-            logging.info('Disabling DDP dynamo optimizer when grad checkpointing enabled.')
-            # As of now (~PyTorch 2.4/2.5), compile + checkpointing but DDP optimizer must be disabled
-            torch._dynamo.config.optimize_ddp = False
-
         model = torch.compile(original_model)
 
     if 'train' not in data:
